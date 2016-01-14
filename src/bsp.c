@@ -7,14 +7,16 @@
 
 #include "stm32f0xx_rcc.h"
 #include "stm32f0xx_gpio.h"
-#include "api.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include "api.h"
+#include "systemStatus.h"
 
 static void initialize_RCC_GPIO(void);
 static void initialize_RCC_CAN(void);
 static void initialize_GPIO_CAN(void);
-static void configure_CAN(void);
+static void initialize_GPIO_LED(void);
+static uint8_t configure_CAN(void);
 static void configure_CAN_NVIC(void);
 
 static void setSTBState(FunctionalState);
@@ -22,23 +24,41 @@ static void setENState(FunctionalState);
 static void setWAKEState(FunctionalState);
 static bool getERRState(void);
 
-static ifaceControl_t canInterface = { {setSTBState, setENState, setWAKEState, getERRState} };
+static ifaceControl_t s_canInterface = {
+		{setSTBState, setENState, setWAKEState, getERRState}
+};
 
-void BSP_init(void) {
+uint8_t BSP_init(void) {
+	uint8_t result = true;
+	SystemTimer_init();
+	SystemStatus_setLedControl(Led_Red_SetState);
 	initialize_RCC_GPIO();
 	initialize_RCC_CAN();
 	initialize_GPIO_CAN();
-	configure_CAN();
+	initialize_GPIO_LED();
+	result &= configure_CAN();
 	configure_CAN_NVIC();
+	return result;
 }
 
 ifaceControl_p BSP_CANControl(void) {
-	return &canInterface;
+	return &s_canInterface;
 }
 
+void Led_Red_SetState(FunctionalState state) {
+	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
+	GPIO_WriteBit(GPIOA, GPIO_Pin_0, val);
+}
+
+void Led_Green_SetState(FunctionalState state) {
+	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
+	GPIO_WriteBit(GPIOA, GPIO_Pin_1, val);
+}
+
+
 static void initialize_RCC_GPIO(void) {
-    RCC_AHBPeriphResetCmd(RCC_AHBPeriph_GPIOA, ENABLE);
-    RCC_AHBPeriphResetCmd(RCC_AHBPeriph_GPIOB, ENABLE);
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
 }
 
 static void initialize_RCC_CAN(void) {
@@ -75,11 +95,28 @@ static void initialize_GPIO_CAN(void) {
 
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource11, GPIO_AF_4);
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource12, GPIO_AF_4);
+
+	/* turn on transmitter */
+	s_canInterface.hardwareLine.setSTB(DISABLE);
+	s_canInterface.hardwareLine.setEN(ENABLE);
+	s_canInterface.hardwareLine.setWAKE(DISABLE);
+}
+
+static void initialize_GPIO_LED(void) {
+
+	GPIO_InitTypeDef iface = {0};
+	iface.GPIO_Mode = GPIO_Mode_OUT;
+	iface.GPIO_OType = GPIO_OType_PP;
+	iface.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+	iface.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	iface.GPIO_Speed = GPIO_Speed_Level_1;
+	GPIO_Init(GPIOA, &iface);
 }
 
 static void setSTBState(FunctionalState state) {
-	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
-	GPIO_WriteBit(GPIOA, GPIO_Pin_5, val);
+	/* low means StandBy */
+	BitAction val = (state == DISABLE) ? Bit_SET : Bit_RESET;
+	GPIO_WriteBit(GPIOA, GPIO_Pin_7, val);
 }
 
 static void setENState(FunctionalState state) {
@@ -88,15 +125,17 @@ static void setENState(FunctionalState state) {
 }
 
 static void setWAKEState(FunctionalState state) {
-	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
-	GPIO_WriteBit(GPIOA, GPIO_Pin_7, val);
+	/* low means WakeUp */
+	BitAction val = (state == DISABLE) ? Bit_SET : Bit_RESET;
+	GPIO_WriteBit(GPIOA, GPIO_Pin_5, val);
 }
 
 static bool getERRState(void) {
-	return (bool)GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_1);
+	/* low means Error, or WakeUp - handled by interrupt */
+	return (bool)!GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_1);
 }
 
-static void configure_CAN(void) {
+static uint8_t configure_CAN(void) {
 	uint8_t initResult = 0;
 	CAN_InitTypeDef iface = {0};
 	CAN_FilterInitTypeDef  ifaceFilter ={0};
@@ -131,13 +170,15 @@ static void configure_CAN(void) {
 	ifaceFilter.CAN_FilterMaskIdHigh = 0x0000;
 	ifaceFilter.CAN_FilterMaskIdLow = 0x0000;
 	ifaceFilter.CAN_FilterFIFOAssignment = CAN_FIFO0;
-
 	ifaceFilter.CAN_FilterActivation = ENABLE;
+
 	CAN_FilterInit(&ifaceFilter);
 
 	CAN_ITConfig(CAN, CAN_IT_FMP0, ENABLE);
 	CAN_ITConfig(CAN, CAN_IT_FMP1, ENABLE);
 	CAN_ITConfig(CAN, CAN_IT_TME, ENABLE);
+
+	return initResult;
 }
 
 static void configure_CAN_NVIC(void){

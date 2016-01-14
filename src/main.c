@@ -4,20 +4,14 @@
 #include <stdbool.h>
 #include "diag/Trace.h"
 #include "api.h"
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wmissing-declarations"
-#pragma GCC diagnostic ignored "-Wreturn-type"
+#include "systemStatus.h"
 
 int main(int argc, char* argv[]) {
 
-	BSP_init();
+	SystemStatus_set(BSP_init() ? INFORM_IDLE : INFORM_ERROR);
 
 	while (true) {
 
     }
 	return 0;
 }
-
-#pragma GCC diagnostic pop

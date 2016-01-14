@@ -9,9 +9,10 @@
 #define API_H_
 
 #include "stm32f0xx.h"
+#include <stdbool.h>
 
 typedef void (*control_f) (FunctionalState);
-typedef FunctionalState (*getState_f) (void);
+typedef bool (*getState_f) (void);
 typedef struct {
 	struct {
 		control_f setSTB;
@@ -22,8 +23,13 @@ typedef struct {
 } ifaceControl_t, *ifaceControl_p;
 
 
-void BSP_init(void);
+uint8_t BSP_init(void);
 ifaceControl_p BSP_CANControl(void);
+
+void Led_Red_SetState(FunctionalState);
+void Led_Green_SetState(FunctionalState);
+
+void SystemTimer_init(void);
 
 
 #endif /* API_H_ */
