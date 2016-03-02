@@ -7,17 +7,23 @@
 
 #include "stm32f0xx_rcc.h"
 #include "stm32f0xx_gpio.h"
+#include "stm32f0xx_adc.h"
+#include "stm32f0xx_tim.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include "api.h"
 #include "systemStatus.h"
 
-static void initialize_RCC_GPIO(void);
-static void initialize_RCC_CAN(void);
+static void initialize_RCC(void);
 static void initialize_GPIO_CAN(void);
 static void initialize_GPIO_LED(void);
+static void initialize_GPIO_ADC(void);
+
 static uint8_t configure_CAN(void);
 static void configure_CAN_NVIC(void);
+static void configure_ADC(void);
+static void configure_ADC_NVIC(void);
+static void configure_TIM1(void);
 
 static void setSTBState(FunctionalState);
 static void setENState(FunctionalState);
@@ -32,12 +38,15 @@ uint8_t BSP_init(void) {
 	uint8_t result = true;
 	SystemTimer_init();
 	SystemStatus_setLedControl(Led_Red_SetState);
-	initialize_RCC_GPIO();
-	initialize_RCC_CAN();
+	initialize_RCC();
 	initialize_GPIO_CAN();
 	initialize_GPIO_LED();
+	initialize_GPIO_ADC();
 	result &= configure_CAN();
 	configure_CAN_NVIC();
+	configure_ADC();
+	configure_ADC_NVIC();
+	configure_TIM1();
 	return result;
 }
 
@@ -56,13 +65,13 @@ void Led_Green_SetState(FunctionalState state) {
 }
 
 
-static void initialize_RCC_GPIO(void) {
+static void initialize_RCC(void) {
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
-}
 
-static void initialize_RCC_CAN(void) {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 }
 
 static void initialize_GPIO_CAN(void) {
@@ -108,6 +117,17 @@ static void initialize_GPIO_LED(void) {
 	iface.GPIO_Mode = GPIO_Mode_OUT;
 	iface.GPIO_OType = GPIO_OType_PP;
 	iface.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+	iface.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	iface.GPIO_Speed = GPIO_Speed_Level_1;
+	GPIO_Init(GPIOA, &iface);
+}
+
+static void initialize_GPIO_ADC(void) {
+
+	GPIO_InitTypeDef iface = {0};
+	iface.GPIO_Mode = GPIO_Mode_AN;
+	iface.GPIO_OType = GPIO_OType_OD;
+	iface.GPIO_Pin = GPIO_Pin_4;
 	iface.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	iface.GPIO_Speed = GPIO_Speed_Level_1;
 	GPIO_Init(GPIOA, &iface);
@@ -187,4 +207,48 @@ static void configure_CAN_NVIC(void){
 	NVIC_InitStructure.NVIC_IRQChannelPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
+}
+
+static void configure_ADC(void) {
+	ADC_InitTypeDef iface;
+
+	iface.ADC_ContinuousConvMode = ENABLE;
+	iface.ADC_DataAlign = ADC_DataAlign_Left;
+	iface.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_TRGO;
+	iface.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+	iface.ADC_Resolution = ADC_Resolution_10b;
+	iface.ADC_ScanDirection = ADC_ScanDirection_Upward;
+
+	ADC_Init(ADC1, &iface);
+	ADC_ClockModeConfig(ADC1, ADC_ClockMode_SynClkDiv4);
+	ADC_ChannelConfig(ADC1, ADC_Channel_4, ADC_SampleTime_239_5Cycles);
+	ADC_ContinuousModeCmd(ADC1, ENABLE);
+
+	ADC_ITConfig(ADC1, ADC_IT_ADRDY, ENABLE);
+	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
+
+	ADC_Cmd(ADC1, ENABLE);
+}
+
+static void configure_ADC_NVIC(void) {
+	NVIC_InitTypeDef NVIC_InitStructure;
+	NVIC_InitStructure.NVIC_IRQChannel = ADC1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+}
+
+static void configure_TIM1(void) {
+	TIM_TimeBaseInitTypeDef iface;
+	iface.TIM_ClockDivision = TIM_CKD_DIV4;
+	iface.TIM_CounterMode = TIM_CounterMode_Up;
+	iface.TIM_Period = 0x0400;
+	iface.TIM_Prescaler = 0400;
+	iface.TIM_RepetitionCounter = 0;
+
+	TIM_TimeBaseInit(TIM1, &iface);
+	TIM_SetAutoreload(TIM1, iface.TIM_Period);
+	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_OC1);
+
+    TIM_Cmd(TIM1, ENABLE);
 }

@@ -8,6 +8,9 @@
 
 int main(int argc, char* argv[]) {
 
+	(void)argc;
+	(void)argv;
+
 	SystemStatus_set(BSP_init() ? INFORM_IDLE : INFORM_ERROR);
 
 	while (true) {
