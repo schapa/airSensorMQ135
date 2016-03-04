@@ -42,11 +42,11 @@ uint8_t BSP_init(void) {
 	initialize_GPIO_CAN();
 	initialize_GPIO_LED();
 	initialize_GPIO_ADC();
-	result &= configure_CAN();
 	configure_CAN_NVIC();
 	configure_ADC();
 	configure_ADC_NVIC();
 	configure_TIM1();
+	result &= configure_CAN();
 	return result;
 }
 
@@ -212,21 +212,26 @@ static void configure_CAN_NVIC(void){
 static void configure_ADC(void) {
 	ADC_InitTypeDef iface;
 
-	iface.ADC_ContinuousConvMode = ENABLE;
-	iface.ADC_DataAlign = ADC_DataAlign_Left;
+	iface.ADC_ContinuousConvMode = DISABLE;
+	iface.ADC_DataAlign = ADC_DataAlign_Right;
 	iface.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_TRGO;
-	iface.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+	iface.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
 	iface.ADC_Resolution = ADC_Resolution_10b;
 	iface.ADC_ScanDirection = ADC_ScanDirection_Upward;
 
 	ADC_Init(ADC1, &iface);
 	ADC_ClockModeConfig(ADC1, ADC_ClockMode_SynClkDiv4);
 	ADC_ChannelConfig(ADC1, ADC_Channel_4, ADC_SampleTime_239_5Cycles);
-	ADC_ContinuousModeCmd(ADC1, ENABLE);
+	ADC_ChannelConfig(ADC1, ADC_Channel_TempSensor, ADC_SampleTime_239_5Cycles);
+	ADC_TempSensorCmd(ENABLE);
+
+	ADC_ContinuousModeCmd(ADC1, DISABLE);
+	ADC_DiscModeCmd(ADC1, ENABLE);
 
 	ADC_ITConfig(ADC1, ADC_IT_ADRDY, ENABLE);
 	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 
+	ADC_GetCalibrationFactor(ADC1);
 	ADC_Cmd(ADC1, ENABLE);
 }
 
@@ -243,12 +248,12 @@ static void configure_TIM1(void) {
 	iface.TIM_ClockDivision = TIM_CKD_DIV4;
 	iface.TIM_CounterMode = TIM_CounterMode_Up;
 	iface.TIM_Period = 0x0400;
-	iface.TIM_Prescaler = 0400;
+	iface.TIM_Prescaler = 0x0400;
 	iface.TIM_RepetitionCounter = 0;
 
 	TIM_TimeBaseInit(TIM1, &iface);
 	TIM_SetAutoreload(TIM1, iface.TIM_Period);
 	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_OC1);
 
-    TIM_Cmd(TIM1, ENABLE);
+//    TIM_Cmd(TIM1, ENABLE);
 }
