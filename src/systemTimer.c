@@ -9,7 +9,7 @@
 #include "systemStatus.h"
 #include <stddef.h>
 
-#define TICKS_PER_SECOND 100
+#define TICKS_PER_SECOND 1000
 
 static struct {
 	uint32_t activeTime;
@@ -24,6 +24,7 @@ static struct {
 static systemStatus_t s_systemStatus = INFORM_ERROR;
 static uint32_t s_systemStatusTimer = 0;
 static ledOutputControl_t s_systemLed = NULL;
+static volatile uint32_t s_delayDecrement = 0;
 
 void SystemStatus_setLedControl(ledOutputControl_t control) {
 	s_systemLed = control;
@@ -52,4 +53,10 @@ void SysTick_Handler(void) {
 	if (++s_systemStatusTimer > period) {
 		s_systemStatusTimer = 0;
 	}
+	s_delayDecrement && s_delayDecrement--;
+}
+
+void SystemTimer_delayMsDummy(uint32_t delay) {
+	s_delayDecrement = delay;
+	while (s_delayDecrement);
 }

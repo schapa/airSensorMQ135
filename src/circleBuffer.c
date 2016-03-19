@@ -55,8 +55,8 @@ uint32_t CircleBuffer_getOccupiedSize(CircleBuffer_p buff) {
 	return size;
 }
 
-uint32_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx) {
-	uint32_t value = 0;
+uint8_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx) {
+	uint8_t value = 0;
 	uint32_t maxIdx = 0;
 
 	do {
@@ -74,7 +74,7 @@ uint32_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx) {
 	return value;
 }
 
-void CircleBuffer_pushEnd(CircleBuffer_p buff, uint32_t data) {
+void CircleBuffer_pushEnd(CircleBuffer_p buff, uint8_t data) {
 
 	if (!buff || !buff->size) {
 		return;

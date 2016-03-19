@@ -9,6 +9,7 @@
 #include "stm32f0xx_gpio.h"
 #include "stm32f0xx_adc.h"
 #include "stm32f0xx_tim.h"
+#include "stm32f0xx_can.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include "api.h"
@@ -66,12 +67,14 @@ void Led_Green_SetState(FunctionalState state) {
 
 
 static void initialize_RCC(void) {
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB, ENABLE);
 
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 }
 
 static void initialize_GPIO_CAN(void) {
@@ -97,6 +100,9 @@ static void initialize_GPIO_CAN(void) {
 	ifaceFeedback.GPIO_Pin = GPIO_Pin_1;
 	ifaceFeedback.GPIO_PuPd = GPIO_PuPd_UP;
 	ifaceFeedback.GPIO_Speed = GPIO_Speed_Level_1;
+
+	/* remap pins */
+	SYSCFG->CFGR1 |= (uint32_t)SYSCFG_CFGR1_PA11_PA12_RMP;
 
 	GPIO_Init(GPIOA, &iface);
 	GPIO_Init(GPIOA, &ifaceControl);
@@ -152,34 +158,31 @@ static void setWAKEState(FunctionalState state) {
 
 static bool getERRState(void) {
 	/* low means Error, or WakeUp - handled by interrupt */
-	return (bool)!GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_1);
+	return (bool)!GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_1);
 }
 
 static uint8_t configure_CAN(void) {
 	uint8_t initResult = 0;
 	CAN_InitTypeDef iface = {0};
 	CAN_FilterInitTypeDef  ifaceFilter ={0};
-	RCC_ClocksTypeDef RCC_Clocks;
 	const uint32_t baudRate = 125000;
-
+	RCC_ClocksTypeDef RCC_Clocks;
 	RCC_GetClocksFreq(&RCC_Clocks);
 
 	iface.CAN_TTCM = DISABLE;
 	iface.CAN_ABOM = DISABLE;
-	iface.CAN_AWUM = ENABLE;
+//	iface.CAN_AWUM = ENABLE;
+	iface.CAN_AWUM = DISABLE;
 	iface.CAN_NART = ENABLE;
 	iface.CAN_RFLM = DISABLE;
 	iface.CAN_TXFP = DISABLE;
-#ifndef DEBUG
 	iface.CAN_Mode = CAN_Mode_Normal;
-#else
-	iface.CAN_Mode = CAN_Mode_LoopBack;
-#endif
 	iface.CAN_SJW = CAN_SJW_1tq;
 	iface.CAN_BS1 = CAN_BS1_4tq;
 	iface.CAN_BS2 = CAN_BS2_3tq;
 	iface.CAN_Prescaler = RCC_Clocks.PCLK_Frequency/(baudRate*(1+4+3)); //(CAN_SJW + CAN_BS1 + CAN_BS2)
 
+	CAN_DeInit(CAN);
 	initResult = CAN_Init(CAN, &iface);
 
 	ifaceFilter.CAN_FilterNumber = 0;
@@ -198,6 +201,12 @@ static uint8_t configure_CAN(void) {
 	CAN_ITConfig(CAN, CAN_IT_FMP1, ENABLE);
 	CAN_ITConfig(CAN, CAN_IT_TME, ENABLE);
 
+	CAN_ITConfig(CAN, CAN_IT_EWG, ENABLE);
+	CAN_ITConfig(CAN, CAN_IT_EPV, ENABLE);
+	CAN_ITConfig(CAN, CAN_IT_BOF, ENABLE);
+	CAN_ITConfig(CAN, CAN_IT_LEC, ENABLE);
+	CAN_ITConfig(CAN, CAN_IT_ERR, ENABLE);
+
 	return initResult;
 }
 
@@ -215,15 +224,13 @@ static void configure_ADC(void) {
 	iface.ADC_ContinuousConvMode = DISABLE;
 	iface.ADC_DataAlign = ADC_DataAlign_Right;
 	iface.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_TRGO;
-	iface.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-	iface.ADC_Resolution = ADC_Resolution_10b;
+	iface.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Falling;//ADC_ExternalTrigConvEdge_None;
+	iface.ADC_Resolution = ADC_Resolution_8b;
 	iface.ADC_ScanDirection = ADC_ScanDirection_Upward;
 
 	ADC_Init(ADC1, &iface);
 	ADC_ClockModeConfig(ADC1, ADC_ClockMode_SynClkDiv4);
 	ADC_ChannelConfig(ADC1, ADC_Channel_4, ADC_SampleTime_239_5Cycles);
-	ADC_ChannelConfig(ADC1, ADC_Channel_TempSensor, ADC_SampleTime_239_5Cycles);
-	ADC_TempSensorCmd(ENABLE);
 
 	ADC_ContinuousModeCmd(ADC1, DISABLE);
 	ADC_DiscModeCmd(ADC1, ENABLE);
@@ -247,13 +254,13 @@ static void configure_TIM1(void) {
 	TIM_TimeBaseInitTypeDef iface;
 	iface.TIM_ClockDivision = TIM_CKD_DIV4;
 	iface.TIM_CounterMode = TIM_CounterMode_Up;
-	iface.TIM_Period = 0x0400;
-	iface.TIM_Prescaler = 0x0400;
+	iface.TIM_Period = 0xFF;
+	iface.TIM_Prescaler = 470;
 	iface.TIM_RepetitionCounter = 0;
 
 	TIM_TimeBaseInit(TIM1, &iface);
 	TIM_SetAutoreload(TIM1, iface.TIM_Period);
-	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_OC1);
+	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);
 
-//    TIM_Cmd(TIM1, ENABLE);
+	TIM_Cmd(TIM1, ENABLE);
 }

@@ -12,8 +12,15 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "circleBuffer.h"
 
+static CircleBuffer_p s_adcBuffer = NULL;
 static bool handleAdcITFlag(uint32_t flag);
+
+void ADC_registerBuffer(CircleBuffer_p newBuff) {
+		CircleBuffer_delete(s_adcBuffer);
+		s_adcBuffer = newBuff;
+}
 
 void ADC1_IRQHandler(void) {
 
@@ -44,9 +51,7 @@ static bool handleAdcITFlag(uint32_t flag) {
 		case ADC_IT_EOSMP: {
 		}break;
 		case ADC_IT_EOC: {
-			uint32_t converted = ADC_GetConversionValue(ADC1);
-			converted = converted*2844/1000;
-			ADC_StartOfConversion(ADC1);
+			CircleBuffer_pushEnd(s_adcBuffer, ADC_GetConversionValue(ADC1));
 		}break;
 		case ADC_IT_EOSEQ: {
 		}break;

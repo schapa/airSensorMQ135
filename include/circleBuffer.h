@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 typedef struct {
-	uint32_t *data;
+	uint8_t *data;
 	uint32_t size;
 
 	uint32_t firstIdx;
@@ -25,8 +25,8 @@ void CircleBuffer_delete(CircleBuffer_p buff);
 
 uint32_t CircleBuffer_size(CircleBuffer_p buff);
 uint32_t CircleBuffer_getOccupiedSize(CircleBuffer_p buff);
-uint32_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx);
-void CircleBuffer_pushEnd(CircleBuffer_p buff, uint32_t data);
+uint8_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx);
+void CircleBuffer_pushEnd(CircleBuffer_p buff, uint8_t data);
 
 
 
