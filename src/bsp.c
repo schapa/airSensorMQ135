@@ -31,14 +31,20 @@ static void setENState(FunctionalState);
 static void setWAKEState(FunctionalState);
 static bool getERRState(void);
 
+static bool sendData(uint32_t id, uint8_t *data, uint8_t size) ;
+static bool sendAirQuality(uint8_t value);
+
 static ifaceControl_t s_canInterface = {
-		{setSTBState, setENState, setWAKEState, getERRState}
+		{setSTBState, setENState, setWAKEState, getERRState},
+		.sendData = sendData,
+		.sendAirQuality = sendAirQuality
 };
 
 uint8_t BSP_init(void) {
 	uint8_t result = true;
 	SystemTimer_init();
 	SystemStatus_setLedControl(Led_Red_SetState);
+	SystemStatus_set(INFORM_INIT);
 	initialize_RCC();
 	initialize_GPIO_CAN();
 	initialize_GPIO_LED();
@@ -263,4 +269,28 @@ static void configure_TIM1(void) {
 	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);
 
 	TIM_Cmd(TIM1, ENABLE);
+}
+
+static bool sendData(uint32_t id, uint8_t *data, uint8_t size) {
+	CanTxMsg txMess = {
+			id,
+			id,
+			CAN_Id_Standard,
+			CAN_RTR_Data,
+			size,
+			{0}
+	};
+	if (size > 8 || id > 0x1FFFFFFF)
+		return false;
+
+	txMess.RTR = size ? CAN_RTR_Data : CAN_RTR_Remote;
+	txMess.IDE = id > 0x7FF ? CAN_Id_Extended : CAN_Id_Standard;
+	memcpy(txMess.Data, data, size);
+
+	return CAN_Transmit(CAN, &txMess) != CAN_TxStatus_NoMailBox;
+}
+
+static bool sendAirQuality(uint8_t value) {
+	const uint32_t id = 0x1DEADFAB;
+	return sendData(id, &value, 1);
 }

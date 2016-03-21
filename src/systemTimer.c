@@ -15,9 +15,11 @@ static struct {
 	uint32_t activeTime;
 	uint32_t passiveTime;
 } s_timing[] = {
-		[INFORM_IDLE] = { TICKS_PER_SECOND, 0 },
-		[INFORM_CONNECTION_LOST] = { 0.1*TICKS_PER_SECOND, 0.5*TICKS_PER_SECOND},
+		[INFORM_INIT] = { 0.1*TICKS_PER_SECOND, 0.3*TICKS_PER_SECOND },
+		[INFORM_PREHEAT] = { TICKS_PER_SECOND, 0 },
+		[INFORM_IDLE] = { 0.1*TICKS_PER_SECOND, TICKS_PER_SECOND },
 		[INFORM_SLEEP] = { 0.05*TICKS_PER_SECOND, 2*TICKS_PER_SECOND},
+		[INFORM_CONNECTION_LOST] = { 0.1*TICKS_PER_SECOND, 0.5*TICKS_PER_SECOND},
 		[INFORM_ERROR] = { 0.05*TICKS_PER_SECOND, 0.05*TICKS_PER_SECOND},
 };
 
@@ -25,6 +27,8 @@ static systemStatus_t s_systemStatus = INFORM_ERROR;
 static uint32_t s_systemStatusTimer = 0;
 static ledOutputControl_t s_systemLed = NULL;
 static volatile uint32_t s_delayDecrement = 0;
+static volatile uint32_t s_uptimeSeconds = 0;
+static volatile uint32_t s_uptimeTicks = 0;
 
 void SystemStatus_setLedControl(ledOutputControl_t control) {
 	s_systemLed = control;
@@ -54,9 +58,17 @@ void SysTick_Handler(void) {
 		s_systemStatusTimer = 0;
 	}
 	s_delayDecrement && s_delayDecrement--;
+
+	if (!(s_uptimeTicks++ % TICKS_PER_SECOND)) {
+		s_uptimeSeconds++;
+	}
 }
 
 void SystemTimer_delayMsDummy(uint32_t delay) {
 	s_delayDecrement = delay;
 	while (s_delayDecrement);
+}
+
+uint32_t SystemStatus_getUptime(void) {
+	return s_uptimeSeconds;
 }

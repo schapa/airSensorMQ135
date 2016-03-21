@@ -27,6 +27,7 @@ uint32_t CircleBuffer_size(CircleBuffer_p buff);
 uint32_t CircleBuffer_getOccupiedSize(CircleBuffer_p buff);
 uint8_t CircleBuffer_getAt(CircleBuffer_p buff, uint32_t idx);
 void CircleBuffer_pushEnd(CircleBuffer_p buff, uint8_t data);
+void CircleBuffer_dropData(CircleBuffer_p buff);
 
 
 

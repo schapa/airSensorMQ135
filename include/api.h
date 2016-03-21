@@ -14,6 +14,8 @@
 
 typedef void (*control_f) (FunctionalState);
 typedef bool (*getState_f) (void);
+typedef bool (*sendData_f) (uint32_t id, uint8_t *data, uint8_t size);
+typedef bool (*sendAirQuality_f) (uint8_t value);
 typedef struct {
 	struct {
 		control_f setSTB;
@@ -21,6 +23,8 @@ typedef struct {
 		control_f setWAKE;
 		getState_f getERR;
 	} hardwareLine;
+	sendData_f sendData;
+	sendAirQuality_f sendAirQuality;
 } ifaceControl_t, *ifaceControl_p;
 
 
@@ -34,6 +38,9 @@ void SystemTimer_init(void);
 void SystemTimer_delayMsDummy(uint32_t delay);
 
 void ADC_registerBuffer(CircleBuffer_p);
+
+void AirQuality_startup(void);
+void AirQuality_periodic(void);
 
 
 #endif /* API_H_ */
