@@ -12,8 +12,11 @@
 #include "stm32f0xx_can.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include "api.h"
 #include "systemStatus.h"
+
+#define DEVICE_CAN_ID 0x135
 
 static void initialize_RCC(void);
 static void initialize_GPIO_CAN(void);
@@ -28,23 +31,24 @@ static void configure_TIM1(void);
 
 static void setSTBState(FunctionalState);
 static void setENState(FunctionalState);
-static void setWAKEState(FunctionalState);
+static void wakeUpTrasciever();
 static bool getERRState(void);
 
 static bool sendData(uint32_t id, uint8_t *data, uint8_t size) ;
 static bool sendAirQuality(uint8_t value);
+static bool sendHartbeat (void);
 
 static ifaceControl_t s_canInterface = {
-		{setSTBState, setENState, setWAKEState, getERRState},
+		{setSTBState, setENState, getERRState},
 		.sendData = sendData,
-		.sendAirQuality = sendAirQuality
+		.sendAirQuality = sendAirQuality,
+		.sendHartbeat = sendHartbeat
 };
+static bool s_isInitialized = false;
 
-uint8_t BSP_init(void) {
-	uint8_t result = true;
+void BSP_init(void) {
 	SystemTimer_init();
 	SystemStatus_setLedControl(Led_Red_SetState);
-	SystemStatus_set(INFORM_INIT);
 	initialize_RCC();
 	initialize_GPIO_CAN();
 	initialize_GPIO_LED();
@@ -53,6 +57,15 @@ uint8_t BSP_init(void) {
 	configure_ADC();
 	configure_ADC_NVIC();
 	configure_TIM1();
+	s_isInitialized = true;
+}
+
+uint8_t BSP_start(void) {
+	uint8_t result = true;
+	if (!s_isInitialized) {
+		BSP_init();
+	}
+	SystemStatus_set(INFORM_INIT);
 	result &= configure_CAN();
 	return result;
 }
@@ -81,6 +94,8 @@ static void initialize_RCC(void) {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+
+	GPIO_DeInit(GPIOA);
 }
 
 static void initialize_GPIO_CAN(void) {
@@ -117,10 +132,9 @@ static void initialize_GPIO_CAN(void) {
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource11, GPIO_AF_4);
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource12, GPIO_AF_4);
 
-	/* turn on transmitter */
-	s_canInterface.hardwareLine.setSTB(DISABLE);
-	s_canInterface.hardwareLine.setEN(ENABLE);
-	s_canInterface.hardwareLine.setWAKE(DISABLE);
+	/* turn off transmitter */
+	setSTBState(ENABLE);
+	setENState(DISABLE);
 }
 
 static void initialize_GPIO_LED(void) {
@@ -156,9 +170,8 @@ static void setENState(FunctionalState state) {
 	GPIO_WriteBit(GPIOA, GPIO_Pin_6, val);
 }
 
-static void setWAKEState(FunctionalState state) {
-	/* low means WakeUp */
-	BitAction val = (state == DISABLE) ? Bit_SET : Bit_RESET;
+static void wakeUpTrasciever() {
+	BitAction val = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_5) ? Bit_RESET : Bit_SET;
 	GPIO_WriteBit(GPIOA, GPIO_Pin_5, val);
 }
 
@@ -173,6 +186,10 @@ static uint8_t configure_CAN(void) {
 	CAN_FilterInitTypeDef  ifaceFilter ={0};
 	const uint32_t baudRate = 125000;
 	RCC_ClocksTypeDef RCC_Clocks;
+
+	wakeUpTrasciever();
+	s_canInterface.hardwareLine.setSTB(DISABLE);
+	s_canInterface.hardwareLine.setEN(ENABLE);
 	RCC_GetClocksFreq(&RCC_Clocks);
 
 	iface.CAN_TTCM = DISABLE;
@@ -234,6 +251,7 @@ static void configure_ADC(void) {
 	iface.ADC_Resolution = ADC_Resolution_8b;
 	iface.ADC_ScanDirection = ADC_ScanDirection_Upward;
 
+	ADC_DeInit(ADC1);
 	ADC_Init(ADC1, &iface);
 	ADC_ClockModeConfig(ADC1, ADC_ClockMode_SynClkDiv4);
 	ADC_ChannelConfig(ADC1, ADC_Channel_4, ADC_SampleTime_239_5Cycles);
@@ -283,7 +301,7 @@ static bool sendData(uint32_t id, uint8_t *data, uint8_t size) {
 	if (size > 8 || id > 0x1FFFFFFF)
 		return false;
 
-	txMess.RTR = size ? CAN_RTR_Data : CAN_RTR_Remote;
+	txMess.RTR = (size || data) ? CAN_RTR_Data : CAN_RTR_Remote;
 	txMess.IDE = id > 0x7FF ? CAN_Id_Extended : CAN_Id_Standard;
 	memcpy(txMess.Data, data, size);
 
@@ -291,6 +309,9 @@ static bool sendData(uint32_t id, uint8_t *data, uint8_t size) {
 }
 
 static bool sendAirQuality(uint8_t value) {
-	const uint32_t id = 0x1DEADFAB;
-	return sendData(id, &value, 1);
+	return sendData(DEVICE_CAN_ID, &value, 1);
+}
+
+static bool sendHartbeat (void) {
+	return sendData(DEVICE_CAN_ID, NULL, 0);
 }

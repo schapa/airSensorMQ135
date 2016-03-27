@@ -15,6 +15,8 @@ int main(int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
 
+	BSP_init();
+
 	AirQuality_startup();
 
 	while (true) {

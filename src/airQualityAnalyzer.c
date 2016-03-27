@@ -12,6 +12,7 @@
 #include "api.h"
 #include "systemStatus.h"
 #include "circleBuffer.h"
+#include "stm32f0xx_pwr.h"
 
 #include "stm32f0xx_can.h"
 
@@ -23,23 +24,20 @@ static CircleBuffer_p s_adcBuffer = NULL;
 
 void AirQuality_startup(void) {
 
-	while (!BSP_init()) {
+	while (!BSP_start()) {
 		SystemStatus_set(INFORM_ERROR);
-		SystemTimer_delayMsDummy(100);
+		/* if failed to initialize CAN-PHY - go to sleep.
+		 * On line restore Transceiver will wake up us */
 		BSP_CANControl()->hardwareLine.setSTB(ENABLE);
-		BSP_CANControl()->hardwareLine.setEN(DISABLE);
-//		BSP_CANControl()->hardwareLine.setWAKE(ENABLE);
 		SystemTimer_delayMsDummy(2000);
 	}
-	SystemTimer_delayMsDummy(100);
 	SystemStatus_set(INFORM_PREHEAT);
-	BSP_CANControl()->sendData(0x22, "HELLO AQ", 8);
-
 	while (SystemStatus_getUptime() < PREHEAT_TIME) {
-		SystemTimer_delayMsDummy(100);
+		SystemTimer_delayMsDummy(500);
+		BSP_CANControl()->sendHartbeat();
 	}
-	SystemStatus_set(INFORM_IDLE);
 
+	SystemStatus_set(INFORM_IDLE);
 	s_adcBuffer = CircleBuffer_new(512);
 	ADC_registerBuffer(s_adcBuffer);
 }
