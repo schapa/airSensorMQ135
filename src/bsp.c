@@ -46,7 +46,9 @@ static ifaceControl_t s_canInterface = {
 };
 static bool s_isInitialized = false;
 
+static volatile EventQueue_p s_eventQueue;
 void BSP_init(void) {
+
 	SystemTimer_init();
 	SystemStatus_setLedControl(Led_Red_SetState);
 	initialize_RCC();
@@ -84,7 +86,26 @@ void Led_Green_SetState(FunctionalState state) {
 	GPIO_WriteBit(GPIOA, GPIO_Pin_1, val);
 }
 
+void BSP_queuePush(Event_p pEvent) {
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	s_eventQueue = Queue_pushEvent(s_eventQueue, pEvent);
+	if (!primask) {
+		__enable_irq();
+	}
+}
 
+void BSP_pendEvent(Event_p pEvent) {
+	while (!s_eventQueue);
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	s_eventQueue = Queue_getEvent(s_eventQueue, pEvent);
+	if (!primask) {
+		__enable_irq();
+	}
+}
+
+/* private */
 static void initialize_RCC(void) {
 
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);

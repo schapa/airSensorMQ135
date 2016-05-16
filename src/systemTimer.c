@@ -30,6 +30,11 @@ static volatile uint32_t s_delayDecrement = 0;
 static volatile uint32_t s_uptimeSeconds = 0;
 static volatile uint32_t s_uptimeTicks = 0;
 
+static struct {
+	uint32_t sec;
+	uint32_t msec;
+} s_uptime;
+
 void SystemStatus_setLedControl(ledOutputControl_t control) {
 	s_systemLed = control;
 }
@@ -56,6 +61,12 @@ void SysTick_Handler(void) {
 		s_systemLed(s_systemStatusTimer <= s_timing[s_systemStatus].activeTime);
 	if (++s_systemStatusTimer > period) {
 		s_systemStatusTimer = 0;
+	}
+	if (++s_uptime.msec >= TICKS_PER_SECOND) {
+		s_uptime.msec = 0;
+		s_uptime.sec++;
+		Event_t seconds = { EVENT_SYSTICK, { ES_SYSTICK_SECOND_ELAPSED }, .data.intptr = s_uptime.sec };
+		BSP_queuePush(&seconds);
 	}
 	s_delayDecrement && s_delayDecrement--;
 

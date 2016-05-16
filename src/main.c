@@ -20,8 +20,10 @@ int main(int argc, char* argv[]) {
 	AirQuality_startup();
 
 	while (true) {
+		Event_t event;
+		BSP_pendEvent(&event);
 		AirQuality_periodic();
-		SystemTimer_delayMsDummy(100);
+//		SystemTimer_delayMsDummy(100);
 	}
 	return 0;
 }
