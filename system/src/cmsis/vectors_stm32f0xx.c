@@ -336,6 +336,7 @@ pHandler g_pfnVectors[] =
 void __attribute__ ((section(".after_vectors")))
 Default_Handler(void)
 {
+	extern void Default_ExceptionHandler(void);
 	Default_ExceptionHandler();
 #if defined(DEBUG)
   __DEBUG_BKPT();

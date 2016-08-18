@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
+
 #include "api.h"
 #include "systemStatus.h"
 
@@ -78,12 +80,12 @@ ifaceControl_p BSP_CANControl(void) {
 
 void Led_Red_SetState(FunctionalState state) {
 	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
-	GPIO_WriteBit(GPIOA, GPIO_Pin_0, val);
+	GPIO_WriteBit(GPIOA, GPIO_Pin_1, val);
 }
 
 void Led_Green_SetState(FunctionalState state) {
 	BitAction val = (state == DISABLE) ? Bit_RESET : Bit_SET;
-	GPIO_WriteBit(GPIOA, GPIO_Pin_1, val);
+	GPIO_WriteBit(GPIOA, GPIO_Pin_0, val);
 }
 
 void BSP_queuePush(Event_p pEvent) {

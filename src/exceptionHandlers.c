@@ -17,10 +17,10 @@ void Default_ExceptionHandler(void);
 void Default_ExceptionHandler(void) {
 
 #if defined(DEBUG)
+#if defined(TRACE)
 	const uint8_t irq0_Offset = 16;
 	uint32_t interruptStatus = SCB->ICSR & 0x3F;
 	uint8_t interruptNumber = SCB->ICSR & 0x3F;
-#if defined(TRACE)
 	trace_printf("Default_ExceptionHandler:");
 	if ((interruptStatus & 0x3F) >= irq0_Offset) {
 		interruptNumber -= irq0_Offset;

@@ -68,7 +68,7 @@ void SysTick_Handler(void) {
 		Event_t seconds = { EVENT_SYSTICK, { ES_SYSTICK_SECOND_ELAPSED }, .data.intptr = s_uptime.sec };
 		BSP_queuePush(&seconds);
 	}
-	s_delayDecrement && s_delayDecrement--;
+	if (s_delayDecrement && s_delayDecrement--){};
 
 	if (!(s_uptimeTicks++ % TICKS_PER_SECOND)) {
 		s_uptimeSeconds++;
