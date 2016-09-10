@@ -63,7 +63,7 @@ void AirQuality_startup(void) {
 	SystemStatus_set(INFORM_PREHEAT);
 	while (SystemStatus_getUptime() < PREHEAT_TIME) {
 		SystemTimer_delayMsDummy(500);
-		BSP_CANControl()->sendHartbeat();
+//		BSP_CANControl()->sendHartbeat();
 	}
 
 	SystemStatus_set(INFORM_IDLE);

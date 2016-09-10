@@ -20,8 +20,9 @@ void CEC_CAN_IRQHandler(void) {
 
 	if (CAN_GetITStatus(CAN, CAN_IT_FMP0)) {
 		CanRxMsg rx = {0};
-		trace_printf("CAN_IT_FMP0 \n");
 		CAN_Receive(CAN, CAN_FIFO0, &rx);
+		BSP_onCanActivity(&rx);
+		trace_printf("CAN_IT_FMP0 \n");
 		trace_printf("StdId %d \n", rx.StdId);
 		trace_printf("ExtId %d \n", rx.ExtId);
 		trace_printf("IDE %d \n", rx.IDE);

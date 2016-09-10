@@ -73,6 +73,7 @@ void SysTick_Handler(void) {
 	if (!(s_uptimeTicks++ % TICKS_PER_SECOND)) {
 		s_uptimeSeconds++;
 	}
+	BSP_onSysTick();
 }
 
 void SystemTimer_delayMsDummy(uint32_t delay) {

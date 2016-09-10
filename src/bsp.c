@@ -18,7 +18,9 @@
 #include "api.h"
 #include "systemStatus.h"
 
-#define DEVICE_CAN_ID 0x135
+#define CAN_CONTROL_UNIT_ID 0x50
+#define CAN_MY_ID 0x135
+#define CAN_DEVICE_TIMEOUT (1000) // 1 sec
 
 static void initialize_RCC(void);
 static void initialize_GPIO_CAN(void);
@@ -47,8 +49,10 @@ static ifaceControl_t s_canInterface = {
 		.sendHartbeat = sendHartbeat
 };
 static bool s_isInitialized = false;
+static size_t volatile s_canMsgTimeout = CAN_DEVICE_TIMEOUT;
 
 static volatile EventQueue_p s_eventQueue;
+
 void BSP_init(void) {
 
 	SystemTimer_init();
@@ -62,6 +66,18 @@ void BSP_init(void) {
 	configure_ADC_NVIC();
 	configure_TIM1();
 	s_isInitialized = true;
+}
+
+void BSP_onSysTick(void) {
+	if (s_canMsgTimeout)
+		s_canMsgTimeout--;
+	else {
+		/* if no activity on Can Bus - go to sleep.
+		 * Transceiver will disable power
+		 * On line activity Transceiver will power up us */
+		BSP_CANControl()->hardwareLine.setSTB(ENABLE);
+		SystemTimer_delayMsDummy(20);
+	}
 }
 
 uint8_t BSP_start(void) {
@@ -105,6 +121,12 @@ void BSP_pendEvent(Event_p pEvent) {
 	if (!primask) {
 		__enable_irq();
 	}
+}
+
+void BSP_onCanActivity(CanRxMsg *msg) {
+
+	if(msg->StdId == CAN_CONTROL_UNIT_ID)
+		s_canMsgTimeout = CAN_DEVICE_TIMEOUT;
 }
 
 /* private */
@@ -332,9 +354,9 @@ static bool sendData(uint32_t id, uint8_t *data, uint8_t size) {
 }
 
 static bool sendAirQuality(uint8_t value) {
-	return sendData(DEVICE_CAN_ID, &value, 1);
+	return sendData(CAN_MY_ID, &value, 1);
 }
 
 static bool sendHartbeat (void) {
-	return sendData(DEVICE_CAN_ID, NULL, 0);
+	return sendData(CAN_MY_ID, NULL, 0);
 }

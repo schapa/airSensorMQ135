@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include "circleBuffer.h"
 #include "Queue.h"
+#include "stm32f0xx_can.h"
 
 typedef void (*control_f) (FunctionalState);
 typedef bool (*getState_f) (void);
@@ -31,11 +32,13 @@ typedef struct {
 
 /* Should be called Once */
 void BSP_init(void);
+void BSP_onSysTick(void);
 uint8_t BSP_start(void);
 ifaceControl_p BSP_CANControl(void);
 
 void BSP_queuePush(Event_p pEvent);
 void BSP_pendEvent(Event_p pEvent);
+void BSP_onCanActivity(CanRxMsg *msg);
 
 void Led_Red_SetState(FunctionalState);
 void Led_Green_SetState(FunctionalState);
